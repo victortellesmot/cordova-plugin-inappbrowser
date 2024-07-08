@@ -20,6 +20,7 @@ package org.apache.cordova.inappbrowser;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
+import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -1383,7 +1384,51 @@ public class InAppBrowser extends CordovaPlugin {
 
         @Override
         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-            handler.proceed();
+            final AlertDialog.Builder builder = new AlertDialog.Builder(cordova.getContext());
+            builder.setMessage("This connection is not secure. Do you want to continue?");
+
+            builder.setPositiveButton("Continue", (dialog, which) -> handler.proceed());
+
+            builder.setNegativeButton("Cancel", (dialog, which) -> {
+                try {
+                    JSONObject obj = new JSONObject();
+                    obj.put("type", LOAD_ERROR_EVENT);
+                    obj.put("url", error.getUrl());
+                    obj.put("code", 0);
+                    obj.put("sslerror", error.getPrimaryError());
+                    String message;
+                    switch (error.getPrimaryError()) {
+                        case SslError.SSL_DATE_INVALID:
+                            message = "The date of the certificate is invalid";
+                            break;
+                        case SslError.SSL_EXPIRED:
+                            message = "The certificate has expired";
+                            break;
+                        case SslError.SSL_IDMISMATCH:
+                            message = "Hostname mismatch";
+                            break;
+                        default:
+                        case SslError.SSL_INVALID:
+                            message = "A generic error occurred";
+                            break;
+                        case SslError.SSL_NOTYETVALID:
+                            message = "The certificate is not yet valid";
+                            break;
+                        case SslError.SSL_UNTRUSTED:
+                            message = "The certificate authority is not trusted";
+                            break;
+                    }
+                    obj.put("message", message);
+
+                    sendUpdate(obj, true, PluginResult.Status.ERROR);
+                } catch (JSONException ex) {
+                    LOG.d(LOG_TAG, "Should never happen");
+                }
+                handler.cancel();
+            });
+
+            final AlertDialog dialog = builder.create();
+            dialog.show();
         }
 
         /**
