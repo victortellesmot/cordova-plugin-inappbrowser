@@ -359,10 +359,12 @@ static CDVWKInAppBrowser* instance = nil;
 
 - (void)openInSystem:(NSURL*)url
 {
-    if ([[UIApplication sharedApplication] openURL:url] == NO) {
-        [[NSNotificationCenter defaultCenter] postNotification:[NSNotification notificationWithName:CDVPluginHandleOpenURLNotification object:url]];
-        [[UIApplication sharedApplication] openURL:url];
-    }
+    [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:^(BOOL success) {
+        if (!success) {
+            [[NSNotificationCenter defaultCenter] postNotification:[NSNotification
+                notificationWithName:CDVPluginHandleOpenURLNotification object:url]];
+        }
+    }];
 }
 
 - (void)loadAfterBeforeload:(CDVInvokedUrlCommand*)command
@@ -539,8 +541,9 @@ static CDVWKInAppBrowser* instance = nil;
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
     }
     
-    //if is an app store link, let the system handle it, otherwise it fails to load it
-    if ([[ url scheme] isEqualToString:@"itms-appss"] || [[ url scheme] isEqualToString:@"itms-apps"]) {
+    //if is an app store, tel, sms, mailto or geo link, let the system handle it, otherwise it fails to load it
+    NSArray * allowedSchemes = @[@"itms-appss", @"itms-apps", @"tel", @"sms", @"mailto", @"geo"];
+    if ([allowedSchemes containsObject:[url scheme]]) {
         [theWebView stopLoading];
         [self openInSystem:url];
         shouldStart = NO;
